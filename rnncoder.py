@@ -1,4 +1,4 @@
-# !/usr/bin/env python
+#!/usr/bin/env python
 
 try:
     import cStringIO as StringIO
@@ -91,33 +91,37 @@ def image_decode(in_filename, out_filename):
     print 'NUM PIXELS:', num_pixels
     print 'SIDE LENGTH:', side_length
 
-    while index < num_pixels:
+    while index + 1 < num_pixels:
         index += 1
         r = read_value(buffer, 'r', 'R')
         if r == EOF:
-            print 'R is EOF'
+            #print 'R is EOF'
             break
         elif r is None:
-            print 'R is None'
-            r = 0
+            #print 'R is None'
+            r = 0xff
+            continue
         g = read_value(buffer, 'g', 'G')
         if g == EOF:
-            print 'G is EOF'
+            #print 'G is EOF'
             break
         elif g is None:
-            print 'G is None'
-            g = 0
+            #print 'G is None'
+            g = 0xff
+            continue
         b = read_value(buffer, 'b', 'B')
         if b == EOF:
-            print 'B is EOF'
+            #print 'B is EOF'
             break
         elif b is None:
-            print 'B is None'
-            b = 0
+            #print 'B is None'
+            b = 0xff
+            continue
+
 
         px = (0xff << 24) | (r << 16) | (g << 8) | b
 
-        print 'Pixel: ', index, side_length, divmod(index, side_length)
+        #print 'Pixel: ', index, side_length, divmod(index, side_length)
 
         x, y = divmod(index, side_length)
         pixels[x, y] = px
