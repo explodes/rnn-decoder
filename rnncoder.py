@@ -8,6 +8,7 @@ except ImportError:
 import functools
 import math
 import os
+import struct
 import sys
 
 
@@ -25,30 +26,27 @@ def opens_files(func):
     return wrapped
 
 
-def prefix(byte, lowcode, highcode):
+def prefix(byte, low_code, high_code):
     if byte > 127:
-        return '%s%s' % (highcode, chr(byte - 128))
+        data = (ord(high_code), byte - 128)
     else:
-        return '%s%s' % (lowcode, chr(byte))
+        data = (ord(low_code), byte)
+    value = struct.pack('BB', *data)
+    return value
 
 
-def read_value(in_file, lowcode, highcode):
-    prefix = in_file.read(1)
-    if prefix == EOF:
+def read_value(data, offset, low_code, high_code):
+    try:
+        prefix_code, byte = struct.unpack_from('BB', data, offset=offset)
+    except struct.error:
         return EOF
-
-    byte = in_file.read(1)
-    if byte == EOF:
-        return EOF
     else:
-        byte = ord(byte)
-
-    if prefix == highcode:
-        return byte + 128
-    elif prefix == lowcode:
-        return byte
-    else:
-        return None
+        if prefix_code == ord(high_code):
+            return byte + 128
+        elif prefix_code == ord(low_code):
+            return byte
+        else:
+            return None
 
 
 def image_encode(in_filename, out_filename):
@@ -69,12 +67,10 @@ def image_encode(in_filename, out_filename):
 def image_decode(in_filename, out_filename):
     from PIL import Image
 
-    buffer = StringIO.StringIO()
     with open(in_filename, 'rb') as in_file:
-        for line in in_file.xreadlines():
-            buffer.write(line)
+        in_data = bytes(in_file.read())
 
-    num_bytes = buffer.tell()
+    num_bytes = len(in_data)
 
     # 6 = (prefix byte + value byte) * (R + G + B)
     side_length = int(math.sqrt(num_bytes / 6))
@@ -84,46 +80,44 @@ def image_decode(in_filename, out_filename):
     image = Image.new("RGB", (side_length, side_length))
     pixels = image.load()
 
-    buffer.seek(0)
-    index = -1
+    pixel_index = -1
 
     print 'NUM BYTES:', num_bytes
     print 'NUM PIXELS:', num_pixels
     print 'SIDE LENGTH:', side_length
 
-    while index + 1 < num_pixels:
-        index += 1
-        r = read_value(buffer, 'r', 'R')
+    while pixel_index + 1 < num_pixels:
+        pixel_index += 1
+        r = read_value(in_data, pixel_index * 6, 'r', 'R')
         if r == EOF:
-            #print 'R is EOF'
+            # print 'R is EOF'
             break
         elif r is None:
-            #print 'R is None'
-            r = 0xff
+            # print 'R is None'
+            # r = 0xff
             continue
-        g = read_value(buffer, 'g', 'G')
+        g = read_value(in_data, pixel_index * 6 + 2, 'g', 'G')
         if g == EOF:
-            #print 'G is EOF'
+            # print 'G is EOF'
             break
         elif g is None:
-            #print 'G is None'
-            g = 0xff
+            # print 'G is None'
+            # g = 0xff
             continue
-        b = read_value(buffer, 'b', 'B')
+        b = read_value(in_data, pixel_index * 6 + 4, 'b', 'B')
         if b == EOF:
-            #print 'B is EOF'
+            # print 'B is EOF'
             break
         elif b is None:
-            #print 'B is None'
-            b = 0xff
+            # print 'B is None'
+            # b = 0xff
             continue
-
 
         px = (0xff << 24) | (r << 16) | (g << 8) | b
 
-        #print 'Pixel: ', index, side_length, divmod(index, side_length)
+        # print 'Pixel: ', index, side_length, divmod(index, side_length)
 
-        x, y = divmod(index, side_length)
+        x, y = divmod(pixel_index, side_length)
         pixels[x, y] = px
 
     image.save(out_filename, 'PNG')
@@ -141,11 +135,14 @@ def encode2(in_file, out_file):
 
 @opens_files
 def decode2(in_file, out_file):
+    in_data = bytes(in_file.read())
+    index = -1
     while True:
-        value = read_value(in_file, 'l', 'h')
+        index += 1
+        value = read_value(in_data, index * 2, 'l', 'h')
         if value == EOF:
             break
-        if value:
+        if value is not None:
             out_file.write(chr(value))
 
 
@@ -153,6 +150,7 @@ def usage():
     print 'usage: <format> <infile> <outfile>'
     print
     print 'formats: %s' % ' '.join(METHODS)
+    print
     sys.exit(0)
 
 
